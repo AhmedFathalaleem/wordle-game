@@ -29,4 +29,7 @@ jobs:
           cp index.html game.js styles.css words.js deploy/
 
       - name: Deploy to S3
-        run: aws s3 sync ./deploy s3://wordle-s3-bucket-229378727473-eu-north-1-an --delete
+        run: >-
+          aws s3 sync ./deploy s3://wordle-s3-bucket-229378727473-eu-north-1-an
+          --delete
+          --cache-control "no-cache, no-store, must-revalidate"
