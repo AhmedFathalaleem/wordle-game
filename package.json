@@ -1,0 +1,43 @@
+{
+  "name": "portfolio-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Production-ready cloud-native portfolio platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,admin,api -c blue,magenta,green \"npm run dev:web\" \"npm run dev:admin\" \"npm run dev:api\"",
+    "dev:web": "npm run dev --workspace=@portfolio/web",
+    "dev:admin": "npm run dev --workspace=@portfolio/admin",
+    "dev:api": "npm run dev --workspace=@portfolio/api",
+    "build": "npm run build --workspace=@portfolio/shared-types --workspace=@portfolio/validation --workspace=@portfolio/ui --workspace=@portfolio/api-client --workspace=@portfolio/api --workspace=@portfolio/web --workspace=@portfolio/admin",
+    "build:packages": "npm run build --workspace=@portfolio/shared-types --workspace=@portfolio/validation --workspace=@portfolio/ui --workspace=@portfolio/api-client",
+    "build:apps": "npm run build --workspace=@portfolio/api --workspace=@portfolio/web --workspace=@portfolio/admin",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "npm run clean --workspaces --if-present",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d",
+    "db:down": "docker compose -f docker/docker-compose.yml down",
+    "db:generate": "npm run db:generate --workspace=@portfolio/api",
+    "db:migrate": "npm run db:migrate --workspace=@portfolio/api",
+    "db:seed": "npm run db:seed --workspace=@portfolio/api",
+    "db:studio": "npm run db:studio --workspace=@portfolio/api"
+  },
+  "devDependencies": {
+    "@portfolio/eslint-config": "*",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
