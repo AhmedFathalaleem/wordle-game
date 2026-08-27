@@ -66,6 +66,16 @@ header h1 {
   justify-self: end;
 }
 
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .toast {
   position: fixed;
   top: 10%;
@@ -236,7 +246,7 @@ header h1 {
 }
 
 .key[data-state="absent"] {
-  background: var(--absent);
+  background: #3a3a3c;
   color: #ffffff;
 }
 
@@ -374,6 +384,23 @@ header h1 {
   text-align: center;
   margin-bottom: 16px;
   line-height: 1.5;
+}
+
+.hint-actions {
+  flex-wrap: wrap;
+}
+
+.hint-letter {
+  width: 64px;
+  height: 64px;
+  margin: 8px auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--correct);
+  color: var(--modal-text);
+  font-size: 2rem;
+  font-weight: 700;
 }
 
 @media (max-width: 400px) {

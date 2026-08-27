@@ -18,6 +18,7 @@ const toastEl = document.getElementById("toast");
 const modalOverlay = document.getElementById("modal-overlay");
 const modalContent = document.getElementById("modal-content");
 const statsBtn = document.getElementById("stats-btn");
+const hintBtn = document.getElementById("hint-btn");
 const helpBtn = document.getElementById("help-btn");
 const modalClose = document.getElementById("modal-close");
 
@@ -149,8 +150,9 @@ function updateKeyboardState(letter, state) {
   const key = keyElements[letter];
   if (!key) return;
 
-  const current = key.dataset.state || "absent";
-  if ((STATE_RANK[state] || 0) > (STATE_RANK[current] || 0)) {
+  const current = key.dataset.state;
+  const currentRank = current ? STATE_RANK[current] : -1;
+  if (STATE_RANK[state] > currentRank) {
     key.dataset.state = state;
   }
 }
@@ -315,6 +317,7 @@ async function submitGuess() {
 
   if (guess === answer) {
     gameOver = true;
+    hintBtn.disabled = true;
     recordGameEnd(true, currentRow + 1);
     renderStatsModal(`🎉 You got it in ${currentRow + 1}!`);
     return;
@@ -325,6 +328,7 @@ async function submitGuess() {
 
   if (currentRow >= MAX_GUESSES) {
     gameOver = true;
+    hintBtn.disabled = true;
     recordGameEnd(false, MAX_GUESSES);
     renderStatsModal(`The word was <strong>${answer.toUpperCase()}</strong>`);
   }
@@ -364,8 +368,62 @@ function newGame() {
   currentCol = 0;
   gameOver = false;
   isAnimating = false;
+  hintBtn.disabled = false;
   resetBoardDisplay();
   resetKeyboardDisplay();
+}
+
+function revealHint(type) {
+  if (gameOver) return;
+
+  const vowels = new Set(["a", "e", "i", "o", "u"]);
+  const eligibleLetters = [...new Set(answer)].filter((letter) =>
+    type === "vowel" ? vowels.has(letter) : !vowels.has(letter),
+  );
+
+  if (eligibleLetters.length === 0) {
+    modalContent.innerHTML = `
+      <h2>No ${type} hint available</h2>
+      <p class="modal-message">The target word contains no eligible ${type}.</p>
+      <div class="modal-actions">
+        <button class="btn" id="hint-close-btn">Close</button>
+      </div>
+    `;
+  } else {
+    const letter =
+      eligibleLetters[Math.floor(Math.random() * eligibleLetters.length)];
+    modalContent.innerHTML = `
+      <h2>Hint</h2>
+      <p class="modal-message">A ${type} in the word is:</p>
+      <div class="hint-letter" aria-label="Revealed letter">${letter.toUpperCase()}</div>
+      <div class="modal-actions">
+        <button class="btn" id="hint-close-btn">Close</button>
+      </div>
+    `;
+  }
+
+  document.getElementById("hint-close-btn").addEventListener("click", closeModal);
+}
+
+function showHintModal() {
+  if (gameOver) return;
+
+  modalContent.innerHTML = `
+    <h2>Need a hint?</h2>
+    <p class="modal-message">Choose which kind of letter to reveal.</p>
+    <div class="modal-actions hint-actions">
+      <button class="btn" id="vowel-hint-btn">Vowel</button>
+      <button class="btn" id="consonant-hint-btn">Consonant</button>
+    </div>
+  `;
+
+  document
+    .getElementById("vowel-hint-btn")
+    .addEventListener("click", () => revealHint("vowel"));
+  document
+    .getElementById("consonant-hint-btn")
+    .addEventListener("click", () => revealHint("consonant"));
+  openModal();
 }
 
 function showHelpModal() {
@@ -411,6 +469,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 statsBtn.addEventListener("click", () => renderStatsModal());
+hintBtn.addEventListener("click", showHintModal);
 helpBtn.addEventListener("click", showHelpModal);
 modalClose.addEventListener("click", closeModal);
 modalOverlay.addEventListener("click", (e) => {
