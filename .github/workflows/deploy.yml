@@ -1,4 +1,4 @@
-name: Deploy Wordle to S3
+name: Deploy WordleClone to S3
 
 on:
   push:
