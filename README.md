@@ -1,6 +1,6 @@
 # Portfolio Platform
 
-Production-ready cloud-native portfolio platform monorepo.
+A simple wordle clone
 
 ## Structure
 
