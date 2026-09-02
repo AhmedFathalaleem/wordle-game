@@ -386,6 +386,23 @@ header h1 {
   line-height: 1.5;
 }
 
+.word-definition {
+  margin: -8px 0 16px;
+  text-align: center;
+  color: #4a4a4a;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.word-definition--loading {
+  color: #666666;
+}
+
+.word-definition--muted {
+  color: #6b7280;
+}
+
 .hint-actions {
   flex-wrap: wrap;
 }

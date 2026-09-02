@@ -32,6 +32,8 @@ let isAnimating = false;
 let stats = loadStats();
 let tiles = [];
 let keyElements = {};
+const wordDefinitionCache = new Map();
+const wordDefinitionPending = new Map();
 
 function loadStats() {
   try {
@@ -228,7 +230,196 @@ function recordGameEnd(won, guessesUsed) {
   saveStats();
 }
 
-function renderStatsModal(extraMessage) {
+function getPreferredDefinitionRank(partOfSpeech) {
+  const order = [
+    "noun",
+    "adjective",
+    "verb",
+    "adverb",
+    "pronoun",
+    "preposition",
+    "conjunction",
+    "interjection",
+  ];
+
+  const normalized = partOfSpeech ? partOfSpeech.toLowerCase() : "";
+  const index = order.indexOf(normalized);
+  return index === -1 ? order.length : index;
+}
+
+function shortenDefinition(text) {
+  const sanitized = String(text)
+    .replace(/\s*\([^)]*\)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!sanitized) return "";
+
+  if (sanitized.length <= 140) return sanitized;
+
+  const truncated = sanitized.slice(0, 137).trim();
+  const lastSpace = truncated.lastIndexOf(" ");
+
+  return lastSpace > 90
+    ? `${truncated.slice(0, lastSpace)}…`
+    : `${truncated}…`;
+}
+
+function selectBestDefinition(payload) {
+  if (!Array.isArray(payload) || payload.length === 0) {
+    return null;
+  }
+
+  const allMeanings = payload
+    .flatMap((entry) => Array.isArray(entry?.meanings) ? entry.meanings : [])
+    .sort(
+      (a, b) =>
+        getPreferredDefinitionRank(a?.partOfSpeech) -
+        getPreferredDefinitionRank(b?.partOfSpeech),
+    );
+
+  for (const meaning of allMeanings) {
+    const defs = Array.isArray(meaning?.definitions) ? meaning.definitions : [];
+
+    for (const item of defs) {
+      const text = typeof item?.definition === "string" ? item.definition : "";
+      const shortened = shortenDefinition(text);
+      if (shortened) {
+        return shortened;
+      }
+    }
+  }
+
+  return null;
+}
+
+async function fetchWithTimeout(url, timeoutMs = 4000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parseDatamuseDefinition(payload) {
+  if (!Array.isArray(payload) || payload.length === 0) {
+    return null;
+  }
+
+  const entry = payload[0];
+  const defs = Array.isArray(entry?.defs) ? entry.defs : [];
+
+  for (const item of defs) {
+    if (typeof item !== "string") continue;
+
+    const trimmed = item.replace(/^[a-z]+\s+/i, "").trim();
+    const shortened = shortenDefinition(trimmed);
+    if (shortened) {
+      return shortened;
+    }
+  }
+
+  return null;
+}
+
+async function fetchDictionaryDefinition(word) {
+  const safeWord = String(word).trim();
+  if (!safeWord) return null;
+
+  const candidates = [
+    `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(safeWord)}`,
+    `https://api.datamuse.com/words?sp=${encodeURIComponent(safeWord)}&md=d&max=1`,
+  ];
+
+  for (const endpoint of candidates) {
+    try {
+      const response = await fetchWithTimeout(endpoint);
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+
+      const dictionaryDefinition = selectBestDefinition(payload);
+      if (dictionaryDefinition) {
+        return dictionaryDefinition;
+      }
+
+      const datamuseDefinition = parseDatamuseDefinition(payload);
+      if (datamuseDefinition) {
+        return datamuseDefinition;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+async function getWordDefinition(word) {
+  const normalized = String(word).trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  if (wordDefinitionCache.has(normalized)) {
+    return wordDefinitionCache.get(normalized);
+  }
+
+  if (wordDefinitionPending.has(normalized)) {
+    return wordDefinitionPending.get(normalized);
+  }
+
+  const pendingRequest = fetchDictionaryDefinition(normalized)
+    .then((definition) => {
+      wordDefinitionCache.set(normalized, definition);
+      wordDefinitionPending.delete(normalized);
+      return definition;
+    })
+    .catch(() => {
+      wordDefinitionCache.set(normalized, null);
+      wordDefinitionPending.delete(normalized);
+      return null;
+    });
+
+  wordDefinitionPending.set(normalized, pendingRequest);
+  return pendingRequest;
+}
+
+function renderWordDefinition(word) {
+  if (!word) {
+    return "";
+  }
+
+  return `
+    <p class="word-definition word-definition--loading" aria-live="polite">
+      Loading definition…
+    </p>
+  `;
+}
+
+async function hydrateWordDefinition(word) {
+  if (!word) return;
+
+  const definition = await getWordDefinition(word);
+  const definitionEl = modalContent.querySelector(".word-definition");
+
+  if (!definitionEl) return;
+
+  if (definition) {
+    definitionEl.textContent = definition;
+    definitionEl.classList.remove("word-definition--loading");
+    return;
+  }
+
+  definitionEl.textContent = "Definition unavailable.";
+  definitionEl.classList.remove("word-definition--loading");
+  definitionEl.classList.add("word-definition--muted");
+}
+
+function renderStatsModal(extraMessage, word = null) {
   const winPct =
     stats.gamesPlayed === 0
       ? 0
@@ -252,6 +443,7 @@ function renderStatsModal(extraMessage) {
 
   modalContent.innerHTML = `
     ${extraMessage ? `<p class="modal-message">${extraMessage}</p>` : ""}
+    ${word ? renderWordDefinition(word) : ""}
     <h2>Statistics</h2>
     <div class="modal-stats">
       <div class="stat-box">
@@ -279,6 +471,10 @@ function renderStatsModal(extraMessage) {
       <button class="btn" id="new-game-btn">Play Again</button>
     </div>
   `;
+
+  if (word) {
+    void hydrateWordDefinition(word);
+  }
 
   document.getElementById("new-game-btn").addEventListener("click", () => {
     closeModal();
@@ -330,7 +526,7 @@ async function submitGuess() {
     gameOver = true;
     hintBtn.disabled = true;
     recordGameEnd(false, MAX_GUESSES);
-    renderStatsModal(`The word was <strong>${answer.toUpperCase()}</strong>`);
+    renderStatsModal(`The word was <strong>${answer.toUpperCase()}</strong>`, answer);
   }
 }
 
